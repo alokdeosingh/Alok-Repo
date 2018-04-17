@@ -1,0 +1,796 @@
+Analysis of Stocks
+===================
+by Alok Deo Singh
+
+
+Abstract
+========
+
+
+Preparation
+-----------
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+options(scipen = 999)
+
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(GGally)
+library(TTR)
+
+```
+
+Loading the Data
+----------------
+#  Declaring Global Variables
+```{r}
+companies <- list('axis','hcl','hdfc','icici','indus','infy','kotak','sbi',
+                  'tcs','techm','wipro','yes')
+file_loc <- list(axis = "Data_Set/AXISBANK.NS.csv",
+                 hcl =  "Data_Set/HCLTECH.NS.csv",
+                 hdfc = "Data_Set/HDFCBANK.NS.csv",
+                 icici = "Data_Set/ICICIBANK.NS.csv",
+                 indus = "Data_Set/INDUSINDBK.NS.csv",
+                 infy = "Data_Set/INFY.NS.csv",
+                 kotak = "Data_Set/KOTAKBANK.NS.csv",
+                 sbi = "Data_Set/SBIN.NS.csv",
+                 tcs = "Data_Set/TCS.NS.csv",
+                 techm = "Data_Set/TECHM.NS.csv",
+                 wipro = "Data_Set/WIPRO.NS.csv",
+                 yes = "Data_Set/YESBANK.NS.csv")
+stock <- NULL
+```
+
+#  Load Data frames
+```{r echo=FALSE, message=TRUE, warning=TRUE, Load_Data}
+
+load_data <- function(companies,file_loc){
+  
+  arguments <- as.list(match.call())
+  floc = eval(arguments$file_loc)
+  companies = eval(arguments$companies)
+  i <- 1
+  for(company in companies){
+     path <- paste(floc[company])
+     temp_name <- data.frame()
+     temp_name <- read.csv(path)
+     comp_name <- rep(companies[i],nrow(temp_name))
+     temp_name$Company <- comp_name
+     stock <<- rbind(stock,temp_name)
+     i <- i + 1  
+     }
+}
+
+load_data(companies,file_loc)
+
+```
+
+Summary of Data set
+-------------------
+### What is the structure of your dataset?
+
+
+
+### What is/are the main feature(s) of interest in your dataset?
+
+
+ 
+```{r echo=FALSE, message=FALSE, warning=FALSE, Summary}
+str(axis)
+summary(axis)
+```
+
+# Data Wrangling Section
+
+```{r}
+data_wrangle <- function(){
+
+      stock$Open <- as.numeric(stock$Open)
+      stock$Close <- as.numeric(stock$Close)
+      stock$High <- as.numeric(stock$High)
+      stock$Low <- as.numeric(stock$Low)
+      stock$Adj.Close <- as.numeric(stock$Adj.Close)
+      stock$Volume <- as.numeric(stock$Volume)
+      stock$Date <- as.Date(stock$Date)
+
+}
+
+data_wrangle()
+
+
+str(stock)
+summary(stock)
+
+```
+```{r}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+# Univariate Plots Section
+```{r}
+# Function to calculate different financial indexes
+apply_sma = function(var, n, data)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, data)
+  sma <- SMA(y,n)
+  eval.parent(substitute(data$SMA<-sma))
+}
+
+apply_sma(Close, 30, data=hcl_df)
+axis_df <- subset(stock,(stock$Company=='axis'))
+
+
+```
+
+
+
+```{r}
+
+hcl_df <- subset(stock,(stock$Company=='hcl'))
+
+A <- ggplot(hcl_df)+
+  geom_line(aes(Date,Close))+
+  geom_line(aes(Date,SMA(hcl_df['Close'],30)),col="blue")+
+  geom_line(aes(Date,EMA(hcl_df['Close'],30)),col="red")+
+  geom_line(aes(Date,EVWMA(hcl_df['Close'],Volume, 30)),col="orange")+
+  ylab("Closing Price (Rs.)")+
+  scale_x_date(date_breaks = "month", date_labels = "%Y-%m")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+
+macd <- MACD(hcl_df['Close'],12,26,9,matype=SMA)
+macd_df <- as.data.frame(macd)
+macd_df$Date <- hcl_df$Date
+B <- ggplot(subset(macd_df,!is.na(signal)),aes(Date,signal))+
+    geom_line()+
+  scale_x_date(date_breaks = "month", date_labels = "%Y-%m")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ylab("MACD Signal")
+
+RSI <- RSI(hcl_df['Close'], n = 14,SMA)
+RSI_df <- as.data.frame(RSI)
+RSI_df$Date <- hcl_df$Date
+C <- ggplot(subset(RSI_df,!is.na(RSI)),aes(Date,RSI))+
+    geom_line()+
+  scale_x_date(date_breaks = "month", date_labels = "%Y-%m")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ylab("RSI")
+
+bbands <- BBands( hcl_df[,c("High","Low","Close")] )
+bbands_df <- as.data.frame(bbands)
+bbands_df$Date <- hcl_df$Date
+D <- ggplot(subset(bbands_df,!is.na(mavg)))+
+    geom_line(aes(Date,dn))+
+    geom_line(aes(Date,mavg),col="red")+
+    geom_line(aes(Date,up),col="blue")+
+  scale_x_date(date_breaks = "month", date_labels = "%Y-%m")+
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())+
+  ylab("Bollinger")
+
+stochOSC <- stoch(hcl_df[,c("High","Low","Close")])
+stochWPR <- WPR(hcl_df[,c("High","Low","Close")])
+stochOSC_df <- as.data.frame(stochOSC)
+stochWPR_df <- as.data.frame(stochWPR)
+stochOSC_df$Date <- hcl_df$Date
+stochWPR_df$Date <- hcl_df$Date
+stochOSC_df$stochWPR <- stochWPR_df$stochWPR
+
+ggplot(subset(tail(stochOSC_df,100)))+
+    geom_line(aes(Date,fastK))+
+    geom_line(aes(Date,stochWPR), col="blue")+
+    geom_line(aes(Date,1-stochWPR), col="red",linetype="dashed")
+#main="Fast %K and Williams %R", 
+#ylab="",
+#ylim=range(cbind(stochOSC, stochWPR), na.rm=TRUE) )
+#lines(tail(stochWPR, 100), col="blue")
+#lines(tail(1-stochWPR, 100), col="red", lty="dashed")
+
+
+ar <- aroon(hcl_df['Close'],30)
+ar_df <- as.data.frame(ar)
+ar_df$Date <- hcl_df$Date
+E <- ggplot(subset(ar_df,!is.na(oscillator)),aes(Date,oscillator))+
+    geom_line()+
+  scale_x_date(date_labels = "%Y-%m",
+               breaks = c(as.Date("2013-06-01"),
+               seq(from=as.Date("2013-03-01"), to=as.Date("2018-09-04"), by="months"),
+               as.Date("2018-04-04")))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Aroon Oscillator")
+               
+#nf <- layout(matrix(c(1,1,2,2), 2, 2, byrow = TRUE))
+
+multiplot(A,B,C,D,E,cols=1)
+
+
+```
+
+We are going to analyze different variables that would be influencing to make
+ the loans delinquent.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Loan_Status}
+# Checking distribution of loan status
+ggplot(data=loans,
+       aes(LoanStatus))+
+  geom_bar(fill="orange",aes(y=(..count..)/sum(..count..)))+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Proportion of Loan Status")+
+  ggtitle("Status of Loans")
+
+```
+
+4.4% of loans are defaulted. This is the data for loans over the years 2006 to
+2014. This is lower than the current average in banking where the per year
+ default rate is close to 1%.
+ 
+```{r echo=FALSE, message=FALSE, warning=FALSE, Term}
+loans$Term.f <- as.factor(loans$Term)
+ggplot(data=loans %>% group_by(Term.f) %>% summarise(n=n()),
+       aes(x=factor(1),y=n,fill=Term.f))+
+  geom_bar(width=1,stat="identity")+
+  coord_polar(theta = "y")+
+  theme_void()+
+  ggtitle("Distribution of Terms")
+```
+
+
+The loans are of 3 terms - 12,36 and 60. More than 90% of the loans are of 36
+ months term. 
+```{r echo=FALSE, message=FALSE, warning=FALSE, Listing_Category}
+lab <- c("Not Available","Debt Consolidation","Home Improvement",
+         "Business","Personal Loan","Student Use","Auto","Other",
+         "Baby&Adoption","Boat", "Cosmetic Procedure", "Engagement Ring", 
+         "Green Loans", "Household Expenses", "Large Purchases",
+         "Medical/Dental","Motorcycle", "RV", "Taxes", 
+         "Vacation", "Wedding Loans")
+
+ggplot(data=loans,
+       aes(factor(ListingCategory)))+
+  geom_bar()+
+  scale_x_discrete(labels = lab)+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  xlab("Type of Loan")+
+  ggtitle("Distribution of Loan Category")
+
+
+```
+
+
+More than 50% of the loans taken are under Debt Consolidation and the rest are 
+under personal loans. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, CreditRating}
+ggplot(data=subset(loans,!(CreditRating  %in% c("","NC"))),
+       aes(CreditRating))+
+  geom_bar(fill="orange",aes(y=(..count..)/sum(..count..)))+
+  ylab("Proportion of credit ratings")+
+  ggtitle("Distribution of Credit Ratings")
+```
+
+
+There are 7 types of Credit Ratings. 'AA' is the top most rating assigned to an
+individual and 'HR' is the lowest rating assigned to an individual. Proper has 
+largest 'C' rating having close to 25000 borrowers. The portfolio of credit 
+ratings for prosper is uniform with 'HR' rating having low population and on the
+ other end of spectrum 'AA' rating is also low.
+ 
+```{r echo=FALSE, message=FALSE, warning=FALSE, IncomeRange}
+ggplot(data=subset(loans,(IncomeVerifiable=="True")),aes(IncomeRange))+
+  geom_bar()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Distribution of Income Range")
+```
+
+
+Mid income group from 25K to 75K has the largest number of borrowers. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Occupation}
+ggplot(data=subset(loans_Occ,Occupation != "" ),
+       aes(x=Occupation))+
+   geom_bar()+
+   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Distribution of Occupation")
+```
+
+
+This is top 10 occupation going for loans from Prosper. Professionals and 
+business people are the occupations having most numbers.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, TotalInquiries}
+ggplot(data=subset(loans,!is.na(TotalInquiries)),
+    aes(x=TotalInquiries))+
+    geom_histogram(binwidth = 4)+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    xlim(0,50)+
+  ggtitle("Distribution of Total Inquiries")
+
+BoxPlots <- subset(loans,!is.na(TotalInquiries) &
+                    TotalInquiries >= 0 &
+                    TotalInquiries < 60 &
+                    DelinquenciesLast7Years < 25 &
+                    !is.na(LenderYield) )
+
+boxplot(BoxPlots$TotalInquiries)
+
+```
+
+
+Most of the Inquiries are between 0 and 20. More the number of Inquiries more 
+probability that loan may get default. The inquiries may be due to loan 
+applications or credit card application. But Inquiries beyond 20 is not a 
+good sign.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Delinquency}
+boxplot(BoxPlots$DelinquenciesLast7Years)
+```
+
+
+Most of the accounts are show 0 delinquency in last 7 years. But Delinquency is
+not a good sign for a borrower.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, LenderYield}
+boxplot(BoxPlots$LenderYield)
+ggplot(data=subset(loans,!is.na(LenderYield)),
+       aes(x=LoanGrade,y=LenderYield))+
+   geom_boxplot()+
+   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Loan Grade/Lender Yield")
+```
+
+
+Lender Yield on bad loans is more than good loans.
+
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+Gender of the borrower could have been helpful; Company the borrower is 
+working for.
+
+### Did you create any new variables from existing variables in the dataset?
+- Created a LoanGrade Variable that was marked as 'Good' for current and paid 
+off loans and 'Bad' for otherwise.
+- Another data frame was created based on top 10 occupation taking loans.
+- LoanOriginationQuater field is separated to Year and Quarter
+- Created new variable for collected interest minus the fees
+
+### Of the features you investigated, were there any unusual distributions? \
+- Monthly income showed very large values
+
+# Bivariate Plots Section
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, LoanGrade}
+ggplot(data=subset(loans,IsBorrowerHomeowner!=""),
+       aes(x=IsBorrowerHomeowner,fill=LoanGrade))+
+  geom_bar(position="dodge")+
+  ggtitle("Borrower is Homeowner for Good or Bad Loans")
+```
+
+
+As per my understanding, people who are home owners might bemaking more default
+on loans. This is because it might be due to home loans on them too. So 
+starting with checking if Borrower defaults more when he is home owner.
+Borrower who are not homeowners seems to be bit more on default count. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, MonthlyIncome}
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000)),
+       aes(LoanGrade,StatedMonthlyIncome))+
+  geom_boxplot()+
+  ggtitle("Box plot - Income/Loan Grade")+
+  ylab("Monthly Income(USD)")
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !(CreditRating  %in% c("","NC")))),
+       aes(CreditRating,StatedMonthlyIncome))+
+  geom_boxplot()+
+  ggtitle("Box plot - Rating/Income")+
+  ylab("Monthly Income(USD)")
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 100000)),
+       aes(LoanOriginationYear,StatedMonthlyIncome))+
+  geom_boxplot()+
+  ggtitle("Box plot - Year/Income")+
+  ylab("Monthly Income(USD)")
+
+```
+
+Next important point was to check the individual's salary monthly and its
+change over time or people having different credit.As expected, people having
+better salary and better credit tend to default less.
+
+Borrowers ending up with good loans have slightly better monthly income. 
+As expected lower rating have lower income and as the rating increases,
+the income increases too.
+Over the years portfolio is between 3000 and 5500 for 50% of
+the borrowers. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, TotalInquiries_Bi}
+ggplot(data=subset(loans,!is.na(TotalInquiries) &
+                     TotalInquiries < 30),
+    aes(x=LoanOriginationYear,y=TotalInquiries))+
+    geom_bar(stat="identity")+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Total Inquiry Over Years")
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 100000) &
+                         !is.na(TotalInquiries) & 
+                        TotalInquiries < 30 &
+                        !(CreditRating  %in% c("","NC"))),
+       aes(CreditRating,TotalInquiries,col=CreditRating))+
+  geom_boxplot()+
+  scale_color_brewer(palette = "RdYlGn")+
+  ggtitle("Credit Rating/Inquiries")
+```
+
+Total Inquiries is an important parameter that has to be study further. Total
+ Inquiries lets us know if there were inquries on borrower's financial
+ condition. Hence this an important parameter to include.
+Total Inquiuries for lower ratings is more than higher ratings 
+which indicates that people with bad credit history have more inquries on their 
+financial status.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, BorrowerAPR}
+ggplot(data=subset(loans,!is.na(BorrowerAPR)), 
+    aes(x=LoanGrade,y=BorrowerAPR))+
+    geom_boxplot()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Box plot - Loan Grade/APr")
+
+ggplot(data=subset(loans,!is.na(BorrowerAPR)), 
+    aes(x=LoanOriginationYear,y=BorrowerAPR))+
+    geom_boxplot()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Box plot - APR over years")
+
+ggplot(data=subset(loans,!is.na(BorrowerAPR) &
+                     !(CreditRating  %in% c("","NC"))), 
+    aes(x=CreditRating,y=BorrowerAPR,col=CreditRating))+
+    geom_boxplot()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+   scale_color_brewer(palette = "RdYlGn")+
+  ggtitle("Box plot - APR for different rating groups")
+```
+
+Borrower APR is cost of credit which is more for loans given on bad credit. This
+ is a important parameter to understand the delinquency.
+
+Borrower APR which is actually cost of credit is more for bad loans. Borrower 
+APR is interest rate + other costs. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Delinquency_bi}
+ggplot(data=subset(loans,!is.na(DelinquenciesLast7Years) &
+                     DelinquenciesLast7Years < 15), 
+    aes(x=LoanOriginationYear,y=DelinquenciesLast7Years))+
+    geom_boxplot()+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Box plot - Delinquencies over years")
+```
+
+
+Delinquency from last 7 years indicates the financial health.
+Delinquency from last 7 years are mostly 0 and over the years portfolio has less
+ delinquent profiles
+ 
+ 
+# Multivariate Plots Section
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, MutliVariate_1}
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !(CreditRating  %in% c("","NC")) &
+                            !is.na(CreditScore.mean)) &
+                     CreditScore.mean > 500),
+       aes(x=CreditRating,y=CreditScore.mean,
+           colour=CreditRating))+
+  geom_boxplot()+
+  scale_colour_brewer(palette="RdYlGn")+
+  facet_grid(LoanGrade ~ .)+
+  ggtitle("Credit Score/Credit Rating for Good/Bad Loans")
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !(CreditRating  %in% c("","NC")) &
+                            !is.na(CreditScore.mean)) &
+                     CreditScore.mean > 500 &
+                     !is.na(InquiriesLast6Months)),
+       aes(x=StatedMonthlyIncome,y=BorrowerAPR,
+           colour=CreditRating))+
+  geom_point()+
+  facet_grid(LoanGrade ~ .)+
+  geom_jitter()+
+  scale_colour_brewer(palette="RdYlGn")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Total Inquiries and Credit Score 
+  over the years for different loan grades \n")+
+  xlab("Monthly Income (USD)")+
+  ylab("Borrower APR(%age)")
+
+```
+
+
+With few exceptions, most of the high credit borrowers have excellent credit 
+score. If we facet it on Good/Bad loans credit score reduces for each Credit
+ Ratings when we go from good to bad.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, MutliVariate_2}
+
+
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !(CreditRating  %in% c("","NC")) &
+                            !is.na(CreditScore.mean))&
+                     CreditScore.mean > 500),
+       aes(x=StatedMonthlyIncome,y=CreditScore.mean,
+           colour=CreditRating))+
+  geom_point(alpha=0.9)+
+  scale_colour_brewer(palette="RdYlGn")+
+  facet_grid(. ~ LoanGrade)+
+  ggtitle("Credit Score and Income for different rating groups")
+
+
+
+```
+
+ Faceting again on second dimension to IsBorrowerOwner there are changes to plot
+ Plot on 3rd quadrant shows that higher the income and score and being
+ home owner ensures good loans.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, MutliVariate_3}
+ggplot(data=loans_selected,
+       aes(y=TotalInquiries,x=StatedMonthlyIncome,
+           col=CreditRating,
+           size=DelinquenciesLast7Years))+
+   geom_point(alpha=1/2,
+              position='jitter')+
+   scale_colour_brewer(palette = "RdYlGn")+
+   facet_grid(LoanGrade~LoanOriginationYear)+
+   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Total Inquiries and Monthly Income
+over the years of different credit ratings")
+
+```
+
+With years, number of loan accounts having delinquency have reduced.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, KNN}
+loans_selected.knn <- select(loans_selected, LoanGrade,
+                             CreditRating, 
+                             Term,
+                             CreditScore.mean,
+                             StatedMonthlyIncome,
+                             DelinquenciesLast7Years,
+                             TotalInquiries,
+                             IsBorrowerHomeowner,
+                             LoanOriginationYear)
+
+
+loans_selected.knn$CreditRating <-
+  as.numeric(factor(loans_selected.knn$CreditRating,levels = 
+                      c('HR','E','D','C','B','A','AA')))
+
+loans_selected.knn$IsBorrowerHomeowner <-
+  as.numeric(factor(loans_selected.knn$IsBorrowerHomeowner
+                    ,levels = 
+                      c('False','True')))
+loans_selected.knn$LoanOriginationYear <- 
+  as.integer(loans_selected.knn$LoanOriginationYear)
+
+loans.train <- subset(loans_selected.knn,LoanOriginationYear < 2013)
+loans.test <- subset(loans_selected.knn,LoanOriginationYear >= 2013)
+
+knn.1 <-  knn(loans.train[,-1],loans.test[,-1],loans.train[,1], k=1)
+
+table(knn.1, loans.test[,1])
+mean(knn.1==loans.test[,1])
+```
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+Interesting relationships were found with following features:
+1. CreditRating
+2. Term
+3. CreditScore.mean
+4. StatedMonthlyIncome
+5. DelinquenciesLast7Years
+6. TotalInquiries
+7. IsBorrowerHomeowner
+8. LoanOriginationYear
+
+Some very obvious relationships were found. For instance,
+Short term loans were less delinquent; Better credit ratings resulted in less
+defaults
+
+
+### Were there any interesting or surprising interactions between features?
+Interesting insights was that before 2010 even high credit ratings
+resulted in defaults. Also borrowers who are not home owners have more
+bad loans. I was expecting homeowners to have more. Then I had observed that
+Credit Rating are in some cases not congruent to Credit Score. Even Low
+credit rating have high scores more than 700.
+
+### OPTIONAL: Did you create any models with your dataset? Discuss the \
+strengths and limitations of your model.
+Yes created a knn model with k=1. It has accuracy of 93%.
+
+# Final Plots and Summary
+
+
+### Plot One
+```{r echo=FALSE, Plot_One}
+
+ggplot(data=subset(loans,!is.na(BorrowerAPR) &
+                      !(CreditRating %in% c("","NC"))), 
+    aes(x=LoanOriginationYear,y=BorrowerAPR,col=CreditRating))+
+    geom_point(alpha=1/2)+
+    geom_jitter()+
+    scale_colour_brewer(palette="RdYlGn")+
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Loan Grade/APR")
+
+
+```
+
+### Description One
+What we are witnessing is scatter plot between APR and Origination Year. It is 
+evident form the plot that borrower APR increases as the rating goes down. Also,
+the plot shows that borrower APR was disparate during initial years of Propser
+business for each rating. For example, for rating 'B' the APR was between
+10% and 25% in year 2008. In 2014 the distribution has become more uniform.
+The reason I am exploring this is because this can be one of the reasons for 
+loans getting default. Incorrect distribution of interest rate across 
+different rating. 
+
+In the next plot we are going to see other parameters which would influence the
+loan default. In the above plots we seen some of them:
+- Credit Score
+- Inquiries
+- Monthly Income
+- Employement Status
+
+
+
+
+### Plot Two
+```{r echo=FALSE, Plot_Two}
+
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !(CreditRating  %in% c("","NC")) &
+                            !is.na(CreditScore.mean)) &
+                     CreditScore.mean > 500 &
+                     !is.na(InquiriesLast6Months) & 
+                     !is.na(EmploymentStatus)),
+       aes(x=StatedMonthlyIncome,y=BorrowerAPR,
+           colour=CreditRating))+
+  geom_point(alpha=1/4)+
+  facet_grid(. ~ LoanGrade)+
+  geom_jitter()+
+  scale_colour_brewer(palette="RdYlGn")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Total Inquiries and Credit Score 
+over the years for different loan grades \n")+
+  xlab("Monthly Income (USD)")+
+  ylab("Borrower APR(%age)")
+
+
+```
+
+The bad loans have the APR randomly distributed. However, with good loans the 
+APR is properly structured and has less variance. There are points where APR is
+low and still loan has become delinquent.
+Now, the question is: How to  know the circumstances in which the loan has 
+become default.I have tuned the parameters as:
+ Inquiries = 0
+ Credit Score > 800
+ 
+ for the next plot. The next plot has to be compared with the above plot. Idea 
+ is to minimize the points in Bad category to come to a conclusion that these 
+ are the parameters which can be tuned to see that loans dont default.
+
+ 
+```{r}
+ggplot(data=subset(loans,(IncomeVerifiable=="True" & 
+                            StatedMonthlyIncome < 60000 &
+                            !is.na(CreditScore.mean)) &
+                     CreditScore.mean > 750 &
+                     !is.na(InquiriesLast6Months) &
+                     InquiriesLast6Months == 0 ),
+       aes(x=StatedMonthlyIncome,y=BorrowerAPR,
+           colour=CreditRating))+
+  geom_point()+
+  facet_grid(LoanGrade ~ .)+
+  scale_colour_brewer(palette="RdYlGn")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ggtitle("Monthly Income and APR for different loan grades
+          in case of high rate loans('A','AA')\n")+
+  xlab("Monthly Income (USD)")+
+  ylab("Borrower APR (%age)")
+
+
+```
+
+The bad loans have considerably decreased by setting the parameters as mentioned
+above. So the conclusion is that in order to reduce the probablity of loan 
+default we can
+- Either borrower with rating 'AA','A'
+- OR for lower rating like 'B','C','D', credit score to be more than 750 and no.
+ of enquiries = 0
+
+ 
+# Reflection
+Prosper loans is peer to peer lending company that provides loans for debt
+consolidation and personal loans. We have data of Prosper loans starting from
+2005 until 2014. Our objective is to find an answer to very important question
+that whether particular loan will be delinquent or not. There were several
+parameters related to nature of loan and broower profile. 
+
+We saw that a borrower with good ratings and score is less tend to default but
+lender yield is low. It is seen that high income and good rating of a borrower
+makes him a safe choice for proper. From the data the proportion of good vs bad
+loans is almost same. So it does not provides a good indicator to say that a 
+particular occupation more prone to default. If an individual is prone to 
+delinquencies in the past there are indications that the same can happen in 
+future.
+
+Loans having large term tend to default more. 
+
