@@ -1,6 +1,6 @@
 Analysis of Stocks
 ===================
-By Alok Deo Singh
+by Alok Deo Singh
 
 
 Abstract
