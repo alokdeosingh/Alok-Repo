@@ -7,8 +7,8 @@ Abstract
 ========
 
 
-Preparation
------------
+Initial Preparation
+-------------------
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 options(scipen = 999)
 
