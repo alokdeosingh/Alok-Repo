@@ -12,7 +12,6 @@ Preparation
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 options(scipen = 999)
 
-
 library(ggplot2)
 library(dplyr)
 library(tidyr)
@@ -54,9 +53,9 @@ load_data <- function(companies,file_loc){
   for(company in companies){
      path <- paste(floc[company])
      temp_name <- data.frame()
-     temp_name <- read.csv(path)
-     comp_name <- rep(companies[i],nrow(temp_name))
-     temp_name$Company <- comp_name
+     temp_name <- read.csv(path,stringsAsFactors = FALSE)
+     comp_name <- rep(companies[[i]], nrow(temp_name))
+     temp_name$company <- as.character(as.factor(comp_name))
      stock <<- rbind(stock,temp_name)
      i <- i + 1  
      }
@@ -77,32 +76,39 @@ Summary of Data set
 
  
 ```{r echo=FALSE, message=FALSE, warning=FALSE, Summary}
-str(axis)
-summary(axis)
+str(stock)
+summary(stock)
 ```
 
 # Data Wrangling Section
 
 ```{r}
 data_wrangle <- function(){
-
-      stock$Open <- as.numeric(stock$Open)
-      stock$Close <- as.numeric(stock$Close)
-      stock$High <- as.numeric(stock$High)
-      stock$Low <- as.numeric(stock$Low)
-      stock$Adj.Close <- as.numeric(stock$Adj.Close)
-      stock$Volume <- as.numeric(stock$Volume)
-      stock$Date <- as.Date(stock$Date)
+      
+      stock <<- subset(stock,stock$Close != "null")
+      
+      stock$Open <<- as.numeric(as.character(stock$Open))
+      stock$Close <<- as.numeric(as.character(stock$Close))
+      stock$High <<- as.numeric(as.character(stock$High))
+      stock$Low <<- as.numeric(as.character(stock$Low))
+      stock$Adj.Close <<- as.numeric(as.character(stock$Adj.Close))
+      stock$Volume <<- as.numeric(stock$Volume)
+      stock$company <<- stock$company
+      stock$Date <<- as.Date(stock$Date)
 
 }
 
 data_wrangle()
 
 
-str(stock)
+str(stock$Open)
 summary(stock)
 
 ```
+
+
+
+
 ```{r}
 # Multiple plot function
 #
@@ -154,19 +160,105 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 # Univariate Plots Section
 ```{r}
 # Function to calculate different financial indexes
-apply_sma = function(var, n, data)
+apply_sma = function(var, n, company_df)
 {
   arguments <- as.list(match.call())
-  y = eval(arguments$var, data)
+  y = eval(arguments$var, company_df)
+  
   sma <- SMA(y,n)
-  eval.parent(substitute(data$SMA<-sma))
+  sma
 }
 
-apply_sma(Close, 30, data=hcl_df)
-axis_df <- subset(stock,(stock$Company=='axis'))
+apply_ema = function(var, n, company_df)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, company_df)
+  
+  ema <- EMA(y,n)
+  ema
+}
+
+
+apply_evwma = function(var, v, n, company_df)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, company_df)
+  z = eval(arguments$v, company_df)
+  
+  evwma <- EVWMA(y,z,n)
+  evwma
+}
+
+apply_macd = function(var, a, b, c, m, company_df)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, company_df)
+  
+  macd <- MACD(y,a,b,c,m)
+  macd
+}
+
+apply_rsi = function(var,n,m,company_df)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, company_df)
+  
+  rsi <- RSI(y,n,m)
+  rsi
+}
+
+apply_bbands = function(df)
+{
+  
+  bbands <- BBands(df)
+  bbands
+}
+
+apply_stoch = function(df)
+{
+  stoch <- stoch(df)
+  stoch
+}
+
+apply_smi = function(df)
+{
+  smi <- SMI(df)
+  smi
+}
+
+apply_wpr = function(df)
+{
+  wpr <- WPR(df)
+  wpr
+}
+
+apply_aroon = function(var, n, company_df)
+{
+  arguments <- as.list(match.call())
+  y = eval(arguments$var, company_df)
+  
+  aroon <- aroon(y,n)
+  aroon
+}
+
+
+
+hcl_df <- subset(stock,(stock$company=='hcl'))
+hcl_df$SMA <- apply_sma(Close, 30, hcl_df)
+hcl_df$EMA <- apply_ema(Close, 30, hcl_df)
+hcl_df$EVWMA <- apply_evwma(Close, Volume, 30, hcl_df)
+hcl_df$MACD <- apply_macd(Close, 12,26,9,'SMA', hcl_df)
+hcl_df$RSI <- apply_rsi(Close, 14,'SMA',hcl_df)
+hcl_df$BBANDS <- apply_bbands(hcl_df[,c("High","Low","Close")])
+hcl_df$STOCH <- apply_stoch(hcl_df[,c("High","Low","Close")])
+hcl_df$SMI <- apply_smi(hcl_df[,c("High","Low","Close")])
+hcl_df$WPR <- apply_wpr(hcl_df[,c("High","Low","Close")])
+hcl_df$AROON <- apply_aroon(Close, 30, hcl_df)
 
 
 ```
+
+
 
 
 
